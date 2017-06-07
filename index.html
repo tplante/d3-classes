@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<head>
+<meta charset="utf-8">
+<style>
+path, line {
+    stroke: #D8D8D8;
+}
+path {
+    fill: none;
+}
+.domain {
+    stroke-width: 3;
+}
+.tick text {
+    fill: #5E6365;
+    font-weight: bold;
+}
+</style>
+</head>
+<body>
+    <div class="line-viz"></div>
+    <div class="bar-viz"></div>
+
+<!-- Babel core (ECMAScript compiler for old browsers) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/6.23.1/babel.min.js"></script>
+<!-- d3 v4 -->
+<script src="https://d3js.org/d3.v4.min.js"></script>
+
+<script>
+const lineData = [{
+    x: 0,
+    y: 1
+}, {
+    x: 1,
+    y: 14
+}, {
+    x: 2,
+    y: 8
+}, {
+    x: 3,
+    y: 21
+}, {
+    x: 4,
+    y: 12
+}, {
+    x: 5,
+    y: 4
+}];
+const barData = [{
+    x: 0,
+    y: 4
+}, {
+    x: 1,
+    y: 12
+}, {
+    x: 2,
+    y: 8
+}, {
+    x: 3,
+    y: 21
+}, {
+    x: 4,
+    y: 14
+}, {
+    x: 5,
+    y: 1
+}];
+
+// extendable parent class
+class Chart {
+    constructor(args) {
+        this.data = args.data;
+        this.selector = args.selector;
+
+        this.drawChart();
+    }
+    drawChart() {
+        this.margin = {
+            top: 30,
+            right: 30,
+            bottom: 30,
+            left: 50
+        }
+        this.width = 980 - this.margin.left - this.margin.right;
+        this.height = 270 - this.margin.top - this.margin.bottom;
+
+        this.svg = d3.select(this.selector)
+                     .append("svg")
+                         .attr("width", this.width + this.margin.left + this.margin.right)
+                         .attr("height", this.height + this.margin.top + this.margin.bottom);
+        this.g = this.svg.append("g")
+                         .attr("transform", "translate(" + this.margin.left + "," + this.margin.top + ")");
+    }
+}
+
+class LineChart extends Chart {
+    constructor(args) {
+        super(args); // pass arguments to parent class
+
+        this.setScales();
+        this.setAxes();
+        this.drawLine();
+    }
+    setScales() {
+        this.xDomain = d3.extent(this.data, function(d) { return d.x; });
+        this.yDomain = d3.extent(this.data, function(d) { return d.y; });
+
+        this.xScale = d3.scaleLinear()
+                        .domain(this.xDomain).nice()
+                        .range([0, this.width]);
+        this.yScale = d3.scaleLinear()
+                        .domain(this.yDomain).nice()
+                        .range([this.height, 0]);
+    }
+    setAxes() {
+        this.xAxis = d3.axisBottom()
+                       .scale(this.xScale)
+                       .ticks(this.data.length)
+                       .tickSize(0)
+                       .tickPadding(15);
+        this.yAxis = d3.axisLeft()
+                       .scale(this.yScale)
+                       .tickSize(-this.width, 0)
+                       .tickPadding(15);
+
+        this.x = this.g.append("g")
+                       .attr("transform", "translate(0," + this.height + ")")
+                       .call(this.xAxis);
+        this.y = this.g.append("g")
+                       .call(this.yAxis);
+    }
+    drawLine() {
+        this.path = this.g.append("g")
+                          .datum(this.data);
+        this.line = d3.line()
+                      .x(function(d) { return this.xScale(d.x); }.bind(this))
+                      .y(function(d) { return this.yScale(d.y); }.bind(this))
+                      .curve(d3.curveCardinal);
+        this.path.append("path")
+                 .attr("d", this.line)
+                 .attr("stroke-width", 1.5)
+                 .style("stroke", "steelblue");
+    }
+}
+
+class BarChart extends Chart {
+    constructor(args) {
+        super(args);
+
+        this.setScales();
+        this.setAxes();
+        this.drawBars();
+    }
+    setScales() {
+        this.xDomain = this.data.map(function(d) { return d.x; });
+        this.yDomain = d3.extent(this.data, function(d) { return d.y; });
+
+        this.xScale = d3.scaleBand()
+                        .domain(this.xDomain)
+                        .rangeRound([0, this.width])
+                        .padding(0.5);
+        this.yScale = d3.scaleLinear()
+                        .domain(this.yDomain).nice()
+                        .range([this.height, 0]);
+    }
+    setAxes() {
+        this.xAxis = d3.axisBottom()
+                       .scale(this.xScale)
+                       .tickSize(0)
+                       .tickPadding(15);
+        this.yAxis = d3.axisLeft()
+                       .scale(this.yScale)
+                       .tickSize(-this.width, 0)
+                       .tickPadding(15);
+
+        this.x = this.g.append("g")
+                       .attr("transform", "translate(0," + this.height + ")")
+                       .call(this.xAxis);
+        this.y = this.g.append("g")
+                       .call(this.yAxis);
+    }
+    drawBars() {
+        this.bar = this.g.selectAll(".bar")
+                         .data(this.data)
+                         .enter()
+                         .append("g")
+                             .attr("class", "bar");
+
+        this.bar.append("rect")
+                .attr("x", function(d) { return this.xScale(d.x); }.bind(this))
+                .attr("y", function(d) { return this.yScale(d.y); }.bind(this))
+                .attr("width", this.xScale.bandwidth())
+                .attr("height", function(d) { return this.height - this.yScale(d.y); }.bind(this))
+                .attr("fill", "steelblue");
+    }
+}
+
+// create instances of chart classes
+let line = new LineChart({
+    data: lineData,
+    selector: '.line-viz'
+});
+let bar = new BarChart({
+    data: barData,
+    selector: '.bar-viz'
+});
+</script>
+</body>
